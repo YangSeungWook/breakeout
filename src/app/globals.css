@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+@theme {
+  --color-arcade-bg: #05070f;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background-color: #05070f;
+  color: #e2e8f0;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  /* 모바일에서 당겨서 새로고침 / 바운스 스크롤 차단 */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 게임 화면에서 길게 눌렀을 때 뜨는 텍스트 선택·복사 메뉴 방지 */
+canvas,
+button {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* 배경 스캔라인 (레트로 CRT 느낌) */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.02) 0px,
+    rgba(255, 255, 255, 0.02) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
