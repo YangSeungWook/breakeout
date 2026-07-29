@@ -1,0 +1,82 @@
+# BREAKOUT · 벽돌깨기
+
+PC(키보드 · 마우스)와 모바일(터치 드래그)을 모두 지원하는 반응형 레트로 벽돌깨기 게임입니다.
+Next.js App Router + TypeScript + Tailwind CSS + HTML5 Canvas로 구현했습니다.
+
+## 실행
+
+```bash
+npm install
+npm run dev      # http://localhost:3000
+npm run build && npm start
+```
+
+## 조작
+
+| 환경 | 조작 |
+| --- | --- |
+| PC 키보드 | `←` `→` 또는 `A` `D` 로 패들 이동, `Space`/`Enter` 발사, `P`/`Esc` 일시정지 |
+| PC 마우스 | 캔버스 위에서 마우스를 움직이면 패들이 따라옴, 클릭으로 발사 |
+| 모바일 | 화면을 터치한 채 좌우 드래그, 탭으로 발사 |
+
+키 입력은 `event.key`가 아니라 `event.code`로 처리해서 한글 IME가 켜져 있어도 A/D/P가 동작합니다.
+
+## 구조
+
+```
+src/
+├─ app/
+│  ├─ layout.tsx          메타데이터 · viewport(확대 차단, viewport-fit=cover)
+│  ├─ page.tsx
+│  └─ globals.css         Tailwind · 오버스크롤 차단 · CRT 스캔라인
+├─ components/game/
+│  ├─ BreakoutGame.tsx    메뉴 ↔ 게임 화면 전환, 저장소 연동
+│  ├─ StartScreen.tsx     닉네임 · 난이도 선택 · 최고 점수 · TOP 5
+│  ├─ GameScreen.tsx      상단바 + 캔버스 + 하단 HUD 레이아웃, 일시정지 오버레이
+│  ├─ GameCanvas.tsx      엔진 ↔ DOM 이벤트 연결 (포인터 · 키보드 · 사운드)
+│  ├─ ControlBar.tsx      Sound / Restart / Pause / Main
+│  ├─ Hud.tsx             Score · Best · Speed · Lives
+│  └─ ResultScreen.tsx    결과 모달 (최고 기록 갱신 알림, 재도전)
+├─ game/
+│  ├─ engine.ts           물리 · 충돌 · 규칙 (DOM 비의존, 단위 테스트 가능)
+│  ├─ renderer.ts         Canvas 2D 드로잉
+│  ├─ levels.ts           스테이지별 벽돌 배치 생성
+│  ├─ audio.ts            WebAudio 오실레이터 효과음 (오디오 파일 없음)
+│  ├─ constants.ts        난이도 프리셋 · 속도 곡선 상수
+│  └─ types.ts
+├─ hooks/
+│  ├─ useCanvas.ts        ResizeObserver + devicePixelRatio 캔버스 관리
+│  └─ useGameLoop.ts      requestAnimationFrame 루프 (unmount 시 cancel)
+└─ lib/storage.ts         LocalStorage 최고 점수 · 설정 · TOP 10
+```
+
+## 설계 메모
+
+**해상도 독립 물리** — 게임 좌표계는 캔버스의 CSS 픽셀을 그대로 쓰고, 공 속도는
+`캔버스 높이 × 비율(초당)`로 정의합니다. 덕분에 320px 폰이든 1200px 데스크톱이든
+체감 난이도가 같고, 창 크기가 바뀌면 진행 중인 오브젝트를 비율에 맞춰 옮기므로
+플레이 도중 화면을 회전해도 게임이 끊기지 않습니다.
+
+**고정 타임스텝** — 물리는 1/240초 고정 스텝으로 돌리고 렌더링만 프레임에 맞춥니다.
+144Hz 모니터와 60Hz 모니터의 결과가 같고, 빠른 공이 벽돌을 뚫고 지나가지 않습니다.
+탭을 전환했다 돌아왔을 때 밀린 시간만큼 폭주하지 않도록 프레임당 스텝 수에 상한을 뒀습니다.
+
+**리렌더 최소화** — 엔진은 mutable 객체를 직접 갱신하고, 점수 · 목숨 · 상태처럼
+UI에 보이는 값이 **실제로 바뀐 프레임에만** React setState를 호출합니다.
+프레임마다 리렌더가 발생하지 않습니다.
+
+**모바일 대응** — 캔버스에 `touch-action: none`, body에 `overscroll-behavior: none`을 적용해
+드래그 중 스크롤 · 당겨서 새로고침이 발생하지 않습니다. 포인터 좌표는 항상
+`getBoundingClientRect()` 기준으로 환산하므로 확대/축소 상태에서도 어긋나지 않습니다.
+마우스는 버튼을 누르지 않아도 추적하고, 터치는 화면에 닿아 있는 동안만 추적합니다.
+
+**난이도 곡선** — 100점마다 공 속도 +5%, 스테이지 클리어마다 +8%, 상한 ×2.2입니다.
+스테이지가 오르면 벽돌 배치 패턴이 바뀌고(꽉 찬 벽 → 체커보드 → 피라미드 → 아치 → 줄무늬),
+3스테이지부터는 2번 맞아야 깨지는 벽돌이 섞입니다.
+
+## 점수 저장
+
+현재는 `LocalStorage`에 최고 점수 · TOP 10 · 설정(닉네임/난이도/사운드)을 저장합니다.
+Supabase 등 DB로 옮길 때는 [src/lib/storage.ts](src/lib/storage.ts)의
+`saveResult` / `loadBest` / `loadScores` 세 함수만 서버 호출로 바꾸면 되고,
+컴포넌트는 수정할 필요가 없습니다.

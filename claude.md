@@ -85,13 +85,39 @@
 
 ## 5. 단계별 구현 체크리스트 (Implementation Steps)
 
-- [ ] 프로젝트 기본 설정 (Next.js, TypeScript, Tailwind CSS)
-- [ ] 게임 데이터 타입 정의 (`Player`, `Brick`, `Ball`, `Paddle`, `GameState`)
-- [ ] 메인 화면 Form (닉네임 입력 + 난이도 선택 + Start)
-- [ ] 반응형 HTML5 Canvas 렌더링 시스템 및 resize 핸들러 구현
-- [ ] 멀티 디바이스 입력 핸들러 구현 (마우스, 키보드 화살표, 터치 드래그)
-- [ ] 물리 엔진 & 충돌 검출 (공-벽, 공-패들, 공-벽돌 충돌)
-- [ ] 상단 컨트롤 바 (Sound, Restart, Pause) & 하단 HUD (Score, Best Score, Lives) UI 구현
-- [ ] 점수에 따른 공 속도 동적 증가 로직 구현
-- [ ] 게임 오버 / 클리어 모달 및 결과 화면 구현
-- [ ] LocalStorage / DB를 통한 최고 점수 기록 저장 및 불러오기
+- [x] 프로젝트 기본 설정 (Next.js, TypeScript, Tailwind CSS)
+- [x] 게임 데이터 타입 정의 (`Player`, `Brick`, `Ball`, `Paddle`, `GameState`)
+- [x] 메인 화면 Form (닉네임 입력 + 난이도 선택 + Start)
+- [x] 반응형 HTML5 Canvas 렌더링 시스템 및 resize 핸들러 구현
+- [x] 멀티 디바이스 입력 핸들러 구현 (마우스, 키보드 화살표, 터치 드래그)
+- [x] 물리 엔진 & 충돌 검출 (공-벽, 공-패들, 공-벽돌 충돌)
+- [x] 상단 컨트롤 바 (Sound, Restart, Pause) & 하단 HUD (Score, Best Score, Lives) UI 구현
+- [x] 점수에 따른 공 속도 동적 증가 로직 구현
+- [x] 게임 오버 / 클리어 모달 및 결과 화면 구현
+- [x] LocalStorage / DB를 통한 최고 점수 기록 저장 및 불러오기
+  - LocalStorage 구현 완료 (최고 점수 · TOP 10 · 설정 저장)
+  - Supabase 등 DB 연동 시 `src/lib/storage.ts` 의 `saveResult` / `loadBest` / `loadScores` 만 교체하면 됩니다
+
+---
+
+## 6. Git 커밋 및 푸시 자동화 규칙 (Git Automation Rules)
+
+Claude는 기능을 구현하거나 수정할 때 다음 Git 작업 절차를 **자동으로 수행**해야 합니다.
+
+1. **커밋 단위 (Commit Granularity):**
+   - 큰 단위의 작업 완료 시에만 커밋하지 말고, **체크리스트의 주요 단계(기능 단위)가 완료될 때마다** 커밋을 수행합니다.
+   - 예: 메인 화면 UI 구현 완료 시 1회 커밋, Canvas 반응형 조작 로직 완료 시 1회 커밋 등.
+
+2. **커밋 전 검증 (Pre-commit Check):**
+   - 커밋하기 전 반드시 TypeScript 타입 에러 및 빌드 에러가 없는지 확인합니다. (`npm run build` 또는 `tsc --noEmit`)
+
+3. **커밋 메시지 컨벤션 (Commit Message Convention):**
+   - 커밋 메시지는 **Conventional Commits** 양식을 따르며 **한글**로 작성합니다.
+     - `feat:` 새로운 기능 추가 (예: `feat: 터치 드래그 기반 패들 조작 기능 추가`)
+     - `fix:` 버그 수정
+     - `style:` UI 디자인 및 CSS 수정
+     - `refactor:` 코드 리팩토링 및 Hook 분리
+     - `docs:` 문서 수정
+
+4. **자동 푸시 (Auto Push):**
+   - 주요 체크리스트 항목(예: 메인 화면, 게임 화면, 결과 화면 등)이 완료되어 스테이블한 상태가 되면 현재 작업 브랜치(`main` 또는 현재 작업 브랜치)로 **즉시 `git push`를 수행**합니다.
