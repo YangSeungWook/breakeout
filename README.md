@@ -24,9 +24,12 @@ npm run typecheck
 타입 검사 → 정적 빌드 → Pages 배포까지 자동으로 처리합니다.
 
 **최초 1회만** 저장소 설정이 필요합니다.
+워크플로 토큰(`GITHUB_TOKEN`)으로는 Pages 사이트를 생성할 수 없어서
+(`Resource not accessible by integration`) 이 단계는 자동화할 수 없습니다.
 
 1. GitHub 저장소 → **Settings** → **Pages**
 2. **Build and deployment** → **Source** 를 `GitHub Actions` 로 변경
+3. **Actions** 탭 → 실패한 `Deploy to GitHub Pages` 실행 → **Re-run jobs**
 
 배포 주소: **https://yangseungwook.github.io/breakeout/**
 

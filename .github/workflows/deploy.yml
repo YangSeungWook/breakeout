@@ -20,9 +20,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -39,12 +39,12 @@ jobs:
           # 저장소 하위 경로(/breakeout)를 basePath 로 적용한다
           GITHUB_PAGES: "true"
 
-      - uses: actions/configure-pages@v5
-        with:
-          # 저장소에 Pages 가 아직 켜져 있지 않으면 워크플로가 직접 활성화한다
-          enablement: true
+      # 저장소의 Pages 설정을 읽어온다.
+      # Settings > Pages > Source 가 "GitHub Actions" 여야 한다.
+      # (워크플로 토큰으로는 Pages 사이트를 생성할 수 없어 최초 1회는 수동 설정이 필요하다)
+      - uses: actions/configure-pages@v6
 
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/upload-pages-artifact@v5
         with:
           path: ./out
 
@@ -56,4 +56,4 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
