@@ -7,9 +7,31 @@ Next.js App Router + TypeScript + Tailwind CSS + HTML5 Canvas로 구현했습니
 
 ```bash
 npm install
-npm run dev      # http://localhost:3000
-npm run build && npm start
+npm run dev        # http://localhost:3000
+npm run build      # 정적 사이트를 out/ 에 생성
+npm run typecheck
 ```
+
+> `output: "export"` 를 쓰므로 `next start` 는 동작하지 않습니다.
+> 빌드 결과를 확인하려면 `out/` 을 정적 서버로 서빙하세요. (`npx serve out`)
+>
+> 배포 시에만 `/breakeout` 하위 경로가 `basePath` 로 붙습니다.
+> 로컬에서 배포와 동일한 경로를 재현하려면 `GITHUB_PAGES=true npm run build` 로 빌드하면 됩니다.
+
+## 배포 (GitHub Pages)
+
+`main` 브랜치에 푸시하면 [deploy.yml](.github/workflows/deploy.yml) 워크플로가
+타입 검사 → 정적 빌드 → Pages 배포까지 자동으로 처리합니다.
+
+**최초 1회만** 저장소 설정이 필요합니다.
+
+1. GitHub 저장소 → **Settings** → **Pages**
+2. **Build and deployment** → **Source** 를 `GitHub Actions` 로 변경
+
+배포 주소: **https://yangseungwook.github.io/breakeout/**
+
+저장소 이름을 바꾸면 [next.config.ts](next.config.ts) 의 `BASE_PATH` 도 함께 바꿔야 합니다.
+사용자/조직 사이트(`<username>.github.io` 저장소)로 옮기는 경우에는 `BASE_PATH` 를 `""` 로 비우면 됩니다.
 
 ## 조작
 
