@@ -72,7 +72,12 @@ src/
 ├─ hooks/
 │  ├─ useCanvas.ts        ResizeObserver + devicePixelRatio 캔버스 관리
 │  └─ useGameLoop.ts      requestAnimationFrame 루프 (unmount 시 cancel)
-└─ lib/storage.ts         LocalStorage 최고 점수 · 설정 · TOP 10
+├─ lib/
+│  ├─ storage.ts          리더보드(Supabase ↔ LocalStorage 폴백) · 설정 저장
+│  └─ supabase.ts         브라우저용 Supabase 클라이언트 (env 없으면 null)
+└─ ...
+
+supabase/migrations/      scores 테이블 · RLS 정책 SQL
 ```
 
 ## 설계 메모
@@ -99,9 +104,33 @@ UI에 보이는 값이 **실제로 바뀐 프레임에만** React setState를 �
 스테이지가 오르면 벽돌 배치 패턴이 바뀌고(꽉 찬 벽 → 체커보드 → 피라미드 → 아치 → 줄무늬),
 3스테이지부터는 2번 맞아야 깨지는 벽돌이 섞입니다.
 
-## 점수 저장
+## 점수 저장 (Supabase)
 
-현재는 `LocalStorage`에 최고 점수 · TOP 10 · 설정(닉네임/난이도/사운드)을 저장합니다.
-Supabase 등 DB로 옮길 때는 [src/lib/storage.ts](src/lib/storage.ts)의
-`saveResult` / `loadBest` / `loadScores` 세 함수만 서버 호출로 바꾸면 되고,
-컴포넌트는 수정할 필요가 없습니다.
+환경변수가 설정돼 있으면 **모든 플레이어가 공유하는 리더보드**를 Supabase에서 읽고 씁니다.
+설정이 없거나 네트워크가 끊기면 자동으로 `LocalStorage` 기록으로 폴백하므로
+키 없이도 게임은 그대로 동작합니다. (닉네임 · 난이도 · 사운드 설정은 기기별 값이라 항상 로컬 저장)
+
+### 설정 순서
+
+1. **Supabase 프로젝트 생성** — [supabase.com/dashboard](https://supabase.com/dashboard) → New project
+   (Region은 `Northeast Asia (Seoul)` 권장, DB 비밀번호는 따로 보관)
+2. **테이블 생성** — 대시보드 좌측 **SQL Editor** 에서
+   [supabase/migrations/20260731000000_create_scores.sql](supabase/migrations/20260731000000_create_scores.sql)
+   내용을 붙여넣고 실행
+3. **키 복사** — **Project Settings → API** 에서 `Project URL` 과 `anon public` 키 확인
+4. **로컬 설정** — `.env.example` 을 `.env.local` 로 복사하고 위 두 값을 채운 뒤 `npm run dev`
+5. **배포 설정** — GitHub 저장소 → **Settings → Secrets and variables → Actions → Variables** 탭에서
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` 를 등록 (등록 후 재배포 필요)
+
+### 보안 메모
+
+정적 사이트라 서버가 없고, `NEXT_PUBLIC_*` 값은 빌드 시 브라우저 번들에 그대로 들어갑니다.
+anon key는 원래 공개를 전제로 한 키라서 노출 자체는 문제가 아니지만,
+**실제 권한은 전적으로 RLS 정책이 결정**합니다. 위 SQL은 다음을 보장합니다.
+
+- `select` · `insert` 만 허용 → 남의 기록을 수정하거나 삭제할 수 없음
+- `CHECK` 제약으로 닉네임 길이 · 난이도 값 · 점수/스테이지 범위를 DB에서 검증
+- `service_role` 키는 절대 클라이언트에 넣지 않음
+
+anon key가 공개된 이상 임의의 점수를 밀어 넣는 것 자체는 막을 수 없습니다.
+엄격한 검증이 필요하면 Edge Function으로 삽입을 감싸거나 익명 로그인 + 레이트 리밋을 붙여야 합니다.

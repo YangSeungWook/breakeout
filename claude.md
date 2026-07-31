@@ -96,7 +96,8 @@
 - [x] 게임 오버 / 클리어 모달 및 결과 화면 구현
 - [x] LocalStorage / DB를 통한 최고 점수 기록 저장 및 불러오기
   - LocalStorage 구현 완료 (최고 점수 · TOP 10 · 설정 저장)
-  - Supabase 등 DB 연동 시 `src/lib/storage.ts` 의 `saveResult` / `loadBest` / `loadScores` 만 교체하면 됩니다
+  - Supabase 연동 완료 (`src/lib/supabase.ts` · `src/lib/storage.ts`, RLS SQL은 `supabase/migrations/`)
+  - 환경변수(`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`)가 없으면 LocalStorage로 자동 폴백
 
 ---
 

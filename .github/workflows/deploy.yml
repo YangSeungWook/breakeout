@@ -38,6 +38,11 @@ jobs:
         env:
           # 저장소 하위 경로(/breakeout)를 basePath 로 적용한다
           GITHUB_PAGES: "true"
+          # Settings > Secrets and variables > Actions > Variables 에 등록한다.
+          # anon key 는 원래 공개용이라 secret 이 아닌 variable 로 둔다.
+          # 비어 있으면 Supabase 없이 localStorage 만으로 동작한다.
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       # 저장소의 Pages 설정을 읽어온다.
       # Settings > Pages > Source 가 "GitHub Actions" 여야 한다.

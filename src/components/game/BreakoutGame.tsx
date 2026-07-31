@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 
 import type { Difficulty, GameResult, Player } from "@/game/types";
 import {
-  loadBest,
-  loadScores,
+  loadBoard,
+  loadCachedBoard,
   loadSettings,
   saveResult,
   saveSettings,
@@ -34,12 +34,27 @@ export default function BreakoutGame() {
 
   // localStorage는 클라이언트에서만 읽어 hydration 불일치를 피한다
   useEffect(() => {
+    let alive = true;
+
     const settings = loadSettings();
     setPlayer({ name: settings.name, difficulty: settings.difficulty });
     setSoundEnabled(settings.sound);
-    setBest(loadBest());
-    setScores(loadScores());
+
+    // 캐시된 기록으로 먼저 그리고, 원격 리더보드가 도착하면 갈아끼운다
+    const cached = loadCachedBoard();
+    setBest(cached.best);
+    setScores(cached.scores);
     setReady(true);
+
+    loadBoard().then((board) => {
+      if (!alive) return;
+      setBest(board.best);
+      setScores(board.scores);
+    });
+
+    return () => {
+      alive = false;
+    };
   }, []);
 
   const handleStart = useCallback((name: string, difficulty: Difficulty) => {
@@ -59,12 +74,15 @@ export default function BreakoutGame() {
         stage,
         date: new Date().toISOString(),
       };
-      const { best: updatedBest, isNewBest } = saveResult(entry);
-      setBest(updatedBest);
-      setScores(loadScores());
-      setResult({ score, stage, isNewBest });
+      // 결과 화면은 즉시 띄우고(네트워크를 기다리지 않는다), 저장은 뒤에서 진행한다
+      setResult({ score, stage, isNewBest: !best || score > best.score });
+
+      saveResult(entry).then((board) => {
+        setBest(board.best);
+        setScores(board.scores);
+      });
     },
-    [player.name, player.difficulty],
+    [player.name, player.difficulty, best],
   );
 
   const handlePlayAgain = useCallback(() => {
