@@ -1,15 +1,23 @@
 import {
   BANNER_DURATION,
+  BRICK_BREAK_DURATION,
+  BRICK_FLASH_DURATION,
   DIFFICULTY_PRESETS,
   FIXED_STEP,
+  HIT_STOP_BREAK,
+  HIT_STOP_TOUGH,
   MAX_BOUNCE_ANGLE,
   MAX_SPEED_MULTIPLIER,
   MAX_STEPS_PER_FRAME,
   PADDLE_KEY_SPEED,
+  SHAKE_BREAK,
+  SHAKE_LIFE_LOST,
+  SHAKE_TOUGH,
   SPEED_STEP_RATIO,
   SPEED_STEP_SCORE,
   STAGE_SPEED_RATIO,
 } from "./constants";
+import { EffectSystem } from "./effects";
 import { createBricks } from "./levels";
 import type {
   Ball,
@@ -52,11 +60,15 @@ export class BreakoutEngine {
   ball: Ball;
   paddle: Paddle;
   bricks: Brick[] = [];
+  /** 파편·충격파·화면 흔들림 (게임 규칙에는 영향 없음) */
+  effects = new EffectSystem();
 
   private difficulty: Difficulty;
   private handlers: EngineHandlers;
   private bannerTimer = 0;
   private accumulator = 0;
+  /** 남은 히트스톱 시간(초). 0보다 크면 공의 물리를 멈춘다 */
+  private hitStop = 0;
   private initialized = false;
   private keys = { left: false, right: false };
   private pointerX: number | null = null;
@@ -97,6 +109,7 @@ export class BreakoutEngine {
     if (!this.initialized) {
       this.width = width;
       this.height = height;
+      this.effects.resize(height);
       this.initialized = true;
       this.reset();
       return;
@@ -107,6 +120,9 @@ export class BreakoutEngine {
     const sy = height / this.height;
     this.width = width;
     this.height = height;
+    // 진행 중인 파편까지 비율로 옮기지는 않는다 (한 번에 지우는 편이 자연스럽다)
+    this.effects.resize(height);
+    this.effects.clear();
 
     for (const brick of this.bricks) {
       brick.x *= sx;
@@ -138,6 +154,8 @@ export class BreakoutEngine {
     this.stage = 1;
     this.time = 0;
     this.accumulator = 0;
+    this.hitStop = 0;
+    this.effects.clear();
     this.paddle.width = this.width * this.preset.paddleWidth;
     this.paddle.height = this.paddleHeight();
     this.paddle.y = this.paddleY();
@@ -170,6 +188,11 @@ export class BreakoutEngine {
 
   setPointer(x: number | null) {
     this.pointerX = x;
+  }
+
+  /** OS의 "동작 줄이기" 설정이 켜져 있으면 화면 흔들림만 끈다 */
+  setReducedMotion(value: boolean) {
+    this.effects.reducedMotion = value;
   }
 
   setKey(dir: "left" | "right", pressed: boolean) {
@@ -251,14 +274,23 @@ export class BreakoutEngine {
       if (this.bannerTimer <= 0) this.setBanner(null);
     }
 
-    this.accumulator += frame;
-    let steps = 0;
-    while (this.accumulator >= FIXED_STEP && steps < MAX_STEPS_PER_FRAME) {
-      this.step(FIXED_STEP);
-      this.accumulator -= FIXED_STEP;
-      steps += 1;
+    // 히트스톱 중에는 물리를 멈춘다. 파편과 연출은 그대로 흘러가므로
+    // 화면이 멈춘 게 아니라 충격에 "박혔다"는 느낌이 난다.
+    if (this.hitStop > 0) {
+      this.hitStop -= frame;
+      this.accumulator = 0;
+    } else {
+      this.accumulator += frame;
+      let steps = 0;
+      while (this.accumulator >= FIXED_STEP && steps < MAX_STEPS_PER_FRAME) {
+        this.step(FIXED_STEP);
+        this.accumulator -= FIXED_STEP;
+        steps += 1;
+      }
+      if (steps >= MAX_STEPS_PER_FRAME) this.accumulator = 0;
     }
-    if (steps >= MAX_STEPS_PER_FRAME) this.accumulator = 0;
+
+    this.effects.update(frame);
 
     if (this.status === "playing") {
       this.ball.trail.push({ x: this.ball.x, y: this.ball.y });
@@ -269,6 +301,7 @@ export class BreakoutEngine {
 
     let finished = false;
     for (const brick of this.bricks) {
+      if (brick.flash > 0) brick.flash -= frame;
       if (brick.breaking > 0) {
         brick.breaking -= frame;
         if (brick.breaking <= 0) finished = true;
@@ -376,6 +409,10 @@ export class BreakoutEngine {
       if (brick.hits <= 0) continue;
       if (!circleIntersectsRect(ball, brick)) continue;
 
+      // 반사로 공을 밀어내기 전에 실제로 닿은 지점을 잡아둔다 (파편이 튀는 방향)
+      const impactX = clamp(ball.x, brick.x, brick.x + brick.width);
+      const impactY = clamp(ball.y, brick.y, brick.y + brick.height);
+
       // 파고든 깊이가 얕은 축으로 반사시킨다
       const overlapX =
         brick.width / 2 + ball.radius - Math.abs(ball.x - (brick.x + brick.width / 2));
@@ -393,12 +430,23 @@ export class BreakoutEngine {
 
       brick.hits -= 1;
       if (brick.hits <= 0) {
-        brick.breaking = 0.18;
+        // 2번 맞아야 깨지는 벽돌은 더 크게 터뜨려 보상감을 준다
+        const tough = brick.maxHits > 1;
+        brick.breaking = BRICK_BREAK_DURATION;
         this.score += brick.points;
         // 점수 구간을 넘기면 공이 빨라진다
         this.applySpeed();
+
+        this.effects.brickDestroyed(brick, impactX, impactY, brick.points);
+        this.effects.addShake(tough ? SHAKE_TOUGH : SHAKE_BREAK);
+        this.hitStop = tough ? HIT_STOP_TOUGH : HIT_STOP_BREAK;
+        this.handlers.onSound?.("brickBreak");
+      } else {
+        brick.flash = BRICK_FLASH_DURATION;
+        this.effects.brickDamaged(brick, impactX, impactY);
+        this.effects.addShake(SHAKE_BREAK * 0.3);
+        this.handlers.onSound?.("brick");
       }
-      this.handlers.onSound?.("brick");
 
       if (this.bricks.every((b) => b.hits <= 0)) this.clearStage();
       // 한 스텝에 벽돌 하나만 처리해서 반사 방향이 꼬이지 않게 한다
@@ -411,6 +459,8 @@ export class BreakoutEngine {
   private loseLife() {
     this.lives -= 1;
     this.ball.trail.length = 0;
+    this.hitStop = 0;
+    this.effects.addShake(SHAKE_LIFE_LOST);
 
     if (this.lives <= 0) {
       this.lives = 0;
@@ -430,6 +480,8 @@ export class BreakoutEngine {
 
   private clearStage() {
     this.stage += 1;
+    this.hitStop = 0;
+    this.effects.clear();
     this.bricks = createBricks(this.width, this.height, this.difficulty, this.stage);
     this.resetBall();
     this.status = "ready";

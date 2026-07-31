@@ -1,3 +1,4 @@
+import { BRICK_BREAK_DURATION, BRICK_FLASH_DURATION } from "./constants";
 import type { BreakoutEngine } from "./engine";
 import type { Brick } from "./types";
 
@@ -54,16 +55,38 @@ function drawBackground(ctx: CanvasRenderingContext2D, w: number, h: number) {
 
 function drawBrick(ctx: CanvasRenderingContext2D, brick: Brick) {
   const destroyed = brick.hits <= 0;
-  // 깨지는 순간엔 하얗게 번쩍이며 사라진다
-  const progress = destroyed ? 1 - Math.max(0, brick.breaking) / 0.18 : 0;
   const radius = Math.min(brick.height / 2, 9);
 
   ctx.save();
+
+  // 깨지는 순간: 벽돌 색 잔광을 남기며 흰 코어가 부풀어 사라진다
   if (destroyed) {
-    ctx.globalAlpha = Math.max(0, 1 - progress);
-    const grow = progress * brick.height * 0.6;
-    ctx.translate(brick.x - grow / 2, brick.y - grow / 2);
-    roundedRectPath(ctx, 0, 0, brick.width + grow, brick.height + grow, radius);
+    const progress = 1 - Math.max(0, brick.breaking) / BRICK_BREAK_DURATION;
+    const fade = Math.max(0, 1 - progress);
+    const grow = progress * brick.height * 1.1;
+
+    ctx.globalCompositeOperation = "lighter";
+    ctx.globalAlpha = fade * 0.55;
+    roundedRectPath(
+      ctx,
+      brick.x - grow,
+      brick.y - grow,
+      brick.width + grow * 2,
+      brick.height + grow * 2,
+      radius + grow,
+    );
+    ctx.fillStyle = brick.color;
+    ctx.fill();
+
+    ctx.globalAlpha = fade;
+    roundedRectPath(
+      ctx,
+      brick.x - grow * 0.35,
+      brick.y - grow * 0.35,
+      brick.width + grow * 0.7,
+      brick.height + grow * 0.7,
+      radius,
+    );
     ctx.fillStyle = "#ffffff";
     ctx.fill();
     ctx.restore();
@@ -72,12 +95,20 @@ function drawBrick(ctx: CanvasRenderingContext2D, brick: Brick) {
 
   // 2회 타격 벽돌은 한 번 맞으면 어두워진다
   const damaged = brick.maxHits > 1 && brick.hits < brick.maxHits;
-  ctx.globalAlpha = damaged ? 0.55 : 1;
+  // 맞은 직후엔 살짝 눌렸다 돌아온다
+  const flash = Math.max(0, brick.flash) / BRICK_FLASH_DURATION;
+  const squash = flash * brick.height * 0.18;
 
+  const x = brick.x + squash * 0.5;
+  const y = brick.y + squash;
+  const w = brick.width - squash;
+  const h = brick.height - squash;
+
+  ctx.globalAlpha = damaged ? 0.55 : 1;
   ctx.shadowColor = brick.color;
-  ctx.shadowBlur = 12;
-  roundedRectPath(ctx, brick.x, brick.y, brick.width, brick.height, radius);
-  const grad = ctx.createLinearGradient(brick.x, brick.y, brick.x, brick.y + brick.height);
+  ctx.shadowBlur = 12 + flash * 20;
+  roundedRectPath(ctx, x, y, w, h, radius);
+  const grad = ctx.createLinearGradient(x, y, x, y + h);
   grad.addColorStop(0, brick.color);
   grad.addColorStop(1, shade(brick.color, -0.35));
   ctx.fillStyle = grad;
@@ -88,15 +119,78 @@ function drawBrick(ctx: CanvasRenderingContext2D, brick: Brick) {
   ctx.globalAlpha = damaged ? 0.25 : 0.45;
   roundedRectPath(
     ctx,
-    brick.x + brick.width * 0.12,
-    brick.y + brick.height * 0.18,
-    brick.width * 0.76,
-    brick.height * 0.22,
-    brick.height * 0.11,
+    x + w * 0.12,
+    y + h * 0.18,
+    w * 0.76,
+    h * 0.22,
+    h * 0.11,
   );
   ctx.fillStyle = "#ffffff";
   ctx.fill();
 
+  // 맞은 순간 하얗게 번쩍 (아직 안 깨진 벽돌)
+  if (flash > 0) {
+    ctx.globalAlpha = flash * 0.8;
+    roundedRectPath(ctx, x, y, w, h, radius);
+    ctx.fillStyle = "#ffffff";
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/** 파괴 지점에서 퍼지는 링 */
+function drawShockwaves(ctx: CanvasRenderingContext2D, engine: BreakoutEngine) {
+  if (!engine.effects.shockwaves.length) return;
+
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  for (const wave of engine.effects.shockwaves) {
+    const t = 1 - wave.life / wave.maxLife;
+    const radius = wave.radius * (1 + t * 3.4);
+    ctx.globalAlpha = (1 - t) * 0.7;
+    ctx.strokeStyle = wave.color;
+    ctx.lineWidth = Math.max(1, wave.radius * 0.35 * (1 - t));
+    ctx.beginPath();
+    ctx.arc(wave.x, wave.y, radius, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+/** 벽돌 파편 (회전하는 사각 조각) */
+function drawParticles(ctx: CanvasRenderingContext2D, engine: BreakoutEngine) {
+  for (const p of engine.effects.particles) {
+    const t = p.life / p.maxLife;
+    ctx.save();
+    // 수명 끝자락에서만 흐려지도록 알파를 늦게 떨어뜨린다
+    ctx.globalAlpha = Math.min(1, t * 2);
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.angle);
+    ctx.fillStyle = p.color;
+    const size = p.size * (0.45 + t * 0.55);
+    ctx.fillRect(-size / 2, -size / 2, size, size);
+    ctx.restore();
+  }
+}
+
+/** 깨진 자리에서 떠오르는 획득 점수 */
+function drawPopups(ctx: CanvasRenderingContext2D, engine: BreakoutEngine) {
+  if (!engine.effects.popups.length) return;
+
+  const size = Math.max(10, Math.min(18, engine.width * 0.028));
+  ctx.save();
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `800 ${size}px ui-monospace, "SFMono-Regular", Menlo, monospace`;
+  for (const popup of engine.effects.popups) {
+    const t = popup.life / popup.maxLife;
+    ctx.globalAlpha = Math.min(1, t * 1.8);
+    ctx.fillStyle = popup.color;
+    ctx.shadowColor = popup.color;
+    ctx.shadowBlur = 10;
+    ctx.fillText(popup.text, popup.x, popup.y);
+  }
   ctx.restore();
 }
 
@@ -199,13 +293,24 @@ function drawBanner(ctx: CanvasRenderingContext2D, engine: BreakoutEngine) {
 }
 
 export function drawScene(ctx: CanvasRenderingContext2D, engine: BreakoutEngine) {
-  const { width, height } = engine;
+  const { width, height, effects } = engine;
+
+  // 배경은 흔들지 않는다. 같이 밀리면 가장자리에 빈 띠가 드러난다.
   drawBackground(ctx, width, height);
 
+  ctx.save();
+  ctx.translate(effects.shakeX, effects.shakeY);
+
   for (const brick of engine.bricks) drawBrick(ctx, brick);
+  drawShockwaves(ctx, engine);
+  drawParticles(ctx, engine);
   drawPaddle(ctx, engine);
   drawBall(ctx, engine);
+  drawPopups(ctx, engine);
 
+  ctx.restore();
+
+  // 안내 문구와 배너는 흔들림과 무관하게 읽히도록 고정한다
   if (engine.status === "ready") drawReadyHint(ctx, engine);
   drawBanner(ctx, engine);
 }

@@ -45,6 +45,48 @@ export interface Brick {
   points: number;
   /** 파괴 연출 타이머(0보다 크면 렌더링만 남은 상태) */
   breaking: number;
+  /** 맞았지만 깨지지 않았을 때의 번쩍임 타이머 */
+  flash: number;
+}
+
+/** 벽돌이 깨질 때 튀는 파편 한 조각 */
+export interface Particle {
+  x: number;
+  y: number;
+  /** px/s */
+  vx: number;
+  vy: number;
+  /** 남은 수명(초) */
+  life: number;
+  maxLife: number;
+  size: number;
+  color: string;
+  /** 회전 각(라디안)과 각속도(rad/s) */
+  angle: number;
+  spin: number;
+}
+
+/** 파괴 지점에서 퍼져 나가는 충격파 링 */
+export interface Shockwave {
+  x: number;
+  y: number;
+  /** 시작 반지름 */
+  radius: number;
+  life: number;
+  maxLife: number;
+  color: string;
+}
+
+/** 파괴 지점에서 떠오르는 획득 점수 */
+export interface ScorePopup {
+  x: number;
+  y: number;
+  /** px/s, 위로 떠오르며 감속한다 */
+  vy: number;
+  life: number;
+  maxLife: number;
+  text: string;
+  color: string;
 }
 
 /** 엔진 → React 로 전달되는 UI 표시용 상태 */
@@ -70,7 +112,10 @@ export interface GameResult {
 
 export type SoundEvent =
   | "paddle"
+  /** 맞았지만 깨지지 않음 */
   | "brick"
+  /** 벽돌이 부서짐 */
+  | "brickBreak"
   | "wall"
   | "launch"
   | "life"

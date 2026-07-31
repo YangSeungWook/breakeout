@@ -77,6 +77,7 @@ export function createBricks(
         // 위쪽 줄일수록 고득점
         points: Math.round((rows - r) * 10 * preset.scoreMultiplier),
         breaking: 0,
+        flash: 0,
       });
     }
   }

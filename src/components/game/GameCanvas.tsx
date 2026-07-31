@@ -67,6 +67,16 @@ export default function GameCanvas({
     soundRef.current?.setEnabled(soundEnabled);
   }, [soundEnabled]);
 
+  // ------------------------------------------------------------- 접근성 설정
+  // OS의 "동작 줄이기"가 켜져 있으면 화면 흔들림만 끈다 (파편·연출은 유지)
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = () => engine.setReducedMotion(query.matches);
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, [engine]);
+
   // ------------------------------------------------------- 외부 조작 인터페이스
   useEffect(() => {
     controlRef.current = {
