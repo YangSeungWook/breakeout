@@ -33,16 +33,32 @@ jobs:
       - name: 타입 검사
         run: npm run typecheck
 
+      # 값이 주입됐는지 로그에서 바로 확인할 수 있게 한다.
+      # 키 값 자체는 찍지 않고 "설정됨 / 비어 있음" 과 URL 호스트만 남긴다.
+      - name: Supabase 환경변수 확인
+        env:
+          SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::warning::Supabase 환경변수가 비어 있습니다. URL=$([ -n "$SUPABASE_URL" ] && echo 설정됨 || echo 없음), ANON_KEY=$([ -n "$SUPABASE_ANON_KEY" ] && echo 설정됨 || echo 없음)"
+            echo "::warning::Settings > Secrets and variables > Actions 에 NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY 를 등록한 뒤 이 워크플로를 다시 실행하세요. (배포본은 localStorage 모드로 동작합니다)"
+          else
+            echo "Supabase URL: $SUPABASE_URL"
+            echo "anon key 길이: ${#SUPABASE_ANON_KEY}"
+          fi
+
       - name: 정적 사이트 빌드
         run: npm run build
         env:
           # 저장소 하위 경로(/breakeout)를 basePath 로 적용한다
           GITHUB_PAGES: "true"
-          # Settings > Secrets and variables > Actions > Variables 에 등록한다.
-          # anon key 는 원래 공개용이라 secret 이 아닌 variable 로 둔다.
+          # Settings > Secrets and variables > Actions 에 등록한다.
+          # anon key 는 어차피 번들에 노출되는 공개 키라 Variables 탭을 권장하지만,
+          # Secrets 탭에 넣어도 동작하도록 둘 다 받는다.
           # 비어 있으면 Supabase 없이 localStorage 만으로 동작한다.
-          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL: ${{ vars.NEXT_PUBLIC_SUPABASE_URL || secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY || secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
 
       # 저장소의 Pages 설정을 읽어온다.
       # Settings > Pages > Source 가 "GitHub Actions" 여야 한다.
